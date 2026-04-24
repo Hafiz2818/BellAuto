@@ -10,6 +10,14 @@ const BUCKET_NAME = "audios"
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
+
+    if (!supabase) {
+      return NextResponse.json({ 
+        error: "Storage service not configured",
+        details: "Supabase environment variables missing"
+      }, { status: 503 })
+    }
+
     const { searchParams } = new URL(request.url)
     const queryUserId = searchParams.get("userId")
     
@@ -33,6 +41,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
+
+    if (!supabase) {
+      return NextResponse.json({ 
+        error: "Storage service not configured",
+        details: "Supabase environment variables missing"
+      }, { status: 503 })
+    }
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -110,6 +125,12 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions)
+
+    if (!supabase) {
+      return NextResponse.json({ 
+        error: "Storage service not configured"
+      }, { status: 503 })
+    }
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

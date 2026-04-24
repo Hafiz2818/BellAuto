@@ -44,6 +44,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
+
+    if (!supabase) {
+      return NextResponse.json({ 
+        error: "Storage service not configured",
+        details: "Supabase environment variables missing"
+      }, { status: 503 })
+    }
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
