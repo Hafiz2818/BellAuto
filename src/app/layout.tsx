@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   keywords: ["Bel Sekolah", "Otomatis", "Jadwal", "Audio", "Sekolah"],
   authors: [{ name: "School Bell System" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/logo.png",
   },
 };
 
