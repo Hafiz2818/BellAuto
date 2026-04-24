@@ -1,16 +1,11 @@
+// app/api/audio/route.ts
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { writeFile, unlink } from "fs/promises"
-import { existsSync, mkdirSync } from "fs"
-import path from "path"
+import { supabase } from "@/lib/supabase"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
-// Ensure audio directory exists
-const audioDir = path.join(process.cwd(), "public", "audio")
-if (!existsSync(audioDir)) {
-  mkdirSync(audioDir, { recursive: true })
-}
+const BUCKET_NAME = "audios"
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +13,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const queryUserId = searchParams.get("userId")
     
-    // Use query userId (for petugas access) or session userId (for admin)
     const targetUserId = queryUserId || session?.user?.id
     
     if (!targetUserId) {
@@ -52,19 +46,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Audio file is required" }, { status: 400 })
     }
 
-    // Ensure directory exists
-    if (!existsSync(audioDir)) {
-      mkdirSync(audioDir, { recursive: true })
+    // Validasi tipe file audio
+    const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac']
+    if (!allowedTypes.includes(audioFile.type)) {
+      return NextResponse.json({ 
+        error: "Invalid audio type. Allowed: MP3, WAV, OGG, AAC" 
+      }, { status: 400 })
     }
 
-    const bytes = await audioFile.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    
+    // Validasi ukuran (max 20MB)
+    if (audioFile.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ 
+        error: "File too large. Max 20MB" 
+      }, { status: 400 })
+    }
+
     const cleanName = audioFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
     const fileName = `audio-${session.user.id}-${Date.now()}-${cleanName}`
-    const filePath = path.join(audioDir, fileName)
     
-    await writeFile(filePath, buffer)
+    // Upload to Supabase Storage
+    const { data, error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(fileName, audioFile, {
+        cacheControl: '3600',
+        contentType: audioFile.type || 'audio/mpeg',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error("Supabase audio upload error:", uploadError)
+      return NextResponse.json({ 
+        error: "Failed to upload audio",
+        details: uploadError.message 
+      }, { status: 500 })
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(fileName)
 
     const audio = await db.audio.create({
       data: {
@@ -72,7 +92,7 @@ export async function POST(request: Request) {
         originalName: audioFile.name,
         mimeType: audioFile.type || "audio/mpeg",
         size: audioFile.size,
-        filePath: `/audio/${fileName}`,
+        filePath: publicUrl, // Simpan URL publik
         userId: session.user.id
       }
     })
@@ -102,7 +122,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 })
     }
 
-    // Get audio info first and verify ownership
+    // Get audio and verify ownership
     const audio = await db.audio.findFirst({
       where: { id, userId: session.user.id }
     })
@@ -111,14 +131,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Audio not found" }, { status: 404 })
     }
 
-    // Delete file
+    // Delete file from Supabase Storage
     try {
-      const filePath = path.join(process.cwd(), "public", audio.filePath)
-      if (existsSync(filePath)) {
-        await unlink(filePath)
+      const fileName = audio.filePath?.split('/').pop()
+      if (fileName) {
+        await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([fileName])
       }
-    } catch {
-      // Ignore if file doesn't exist
+    } catch (e) {
+      console.log("Could not delete audio from storage:", e)
+      // Lanjutkan delete dari DB meski file storage gagal dihapus
     }
 
     // Delete from database

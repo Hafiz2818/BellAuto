@@ -49,3 +49,7 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+#file local
+public/uploads/
+public/audio/

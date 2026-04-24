@@ -1,16 +1,11 @@
+// app/api/identity/route.ts
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { writeFile, unlink } from "fs/promises"
-import { existsSync, mkdirSync } from "fs"
-import path from "path"
+import { supabase } from "@/lib/supabase"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), "public", "uploads")
-if (!existsSync(uploadsDir)) {
-  mkdirSync(uploadsDir, { recursive: true })
-}
+const BUCKET_NAME = "logos"
 
 export async function GET() {
   try {
@@ -25,7 +20,6 @@ export async function GET() {
       })
     }
 
-    // Use findFirst instead of findUnique for better compatibility
     const identity = await db.appIdentity.findFirst({
       where: { userId: session.user.id }
     })
@@ -43,7 +37,7 @@ export async function GET() {
       description: "",
       address: "",
       logoUrl: ""
-    })
+    }, { status: 500 })
   }
 }
 
@@ -61,54 +55,74 @@ export async function POST(request: Request) {
     const address = formData.get("address") as string || ""
     const logoFile = formData.get("logo") as File | null
 
-    console.log("Identity POST request:", {
-      userId: session.user.id,
-      schoolName,
-      description,
-      address,
-      hasLogoFile: !!logoFile,
-      logoFileSize: logoFile?.size
-    })
-
     let logoUrl: string | undefined = undefined
 
-    // Handle logo upload
+    // Handle logo upload to Supabase Storage
     if (logoFile && logoFile.size > 0) {
-      if (!existsSync(uploadsDir)) {
-        mkdirSync(uploadsDir, { recursive: true })
+      // Validasi tipe file
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+      if (!allowedTypes.includes(logoFile.type)) {
+        return NextResponse.json({ 
+          error: "Invalid file type. Allowed: JPG, PNG, WEBP, SVG" 
+        }, { status: 400 })
       }
 
-      const bytes = await logoFile.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-      
+      // Validasi ukuran (max 5MB)
+      if (logoFile.size > 5 * 1024 * 1024) {
+        return NextResponse.json({ 
+          error: "File too large. Max 5MB" 
+        }, { status: 400 })
+      }
+
       const ext = logoFile.name.split(".").pop() || "png"
       const fileName = `logo-${session.user.id}-${Date.now()}.${ext}`
-      const filePath = path.join(uploadsDir, fileName)
       
-      await writeFile(filePath, buffer)
-      logoUrl = `/uploads/${fileName}`
-      console.log("Logo saved:", logoUrl)
+      // Upload to Supabase Storage
+      const { data, error: uploadError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(fileName, logoFile, {
+          cacheControl: '3600',
+          contentType: logoFile.type,
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error("Supabase upload error:", uploadError)
+        return NextResponse.json({ 
+          error: "Failed to upload logo",
+          details: uploadError.message 
+        }, { status: 500 })
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(fileName)
+      
+      logoUrl = publicUrl
+      console.log("Logo uploaded to Supabase:", logoUrl)
     }
 
-    // Use findFirst instead of findUnique for compatibility
+    // Check existing identity
     const existing = await db.appIdentity.findFirst({
       where: { userId: session.user.id }
     })
 
     if (existing) {
-      // Delete old logo if new one uploaded
+      // Delete old logo from Supabase Storage if new one uploaded
       if (logoUrl && existing.logoUrl) {
         try {
-          const oldPath = path.join(process.cwd(), "public", existing.logoUrl)
-          if (existsSync(oldPath)) {
-            await unlink(oldPath)
+          const oldFileName = existing.logoUrl.split('/').pop()
+          if (oldFileName && oldFileName !== logoUrl.split('/').pop()) {
+            await supabase.storage
+              .from(BUCKET_NAME)
+              .remove([oldFileName])
           }
         } catch (e) {
-          console.log("Could not delete old logo:", e)
+          console.log("Could not delete old logo from storage:", e)
         }
       }
 
-      // Update using id instead of userId
       const updated = await db.appIdentity.update({
         where: { id: existing.id },
         data: {
@@ -118,7 +132,6 @@ export async function POST(request: Request) {
           ...(logoUrl && { logoUrl })
         }
       })
-      console.log("Identity updated:", updated)
       return NextResponse.json(updated)
     } else {
       const created = await db.appIdentity.create({
@@ -130,7 +143,6 @@ export async function POST(request: Request) {
           userId: session.user.id
         }
       })
-      console.log("Identity created:", created)
       return NextResponse.json(created)
     }
   } catch (error) {

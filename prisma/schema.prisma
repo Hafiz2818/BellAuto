@@ -30,7 +30,7 @@ model AppIdentity {
   schoolName  String   @default("Sekolah")
   description String?
   address     String?
-  logoUrl     String?
+  logoUrl     String?  
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt   DateTime @updatedAt
@@ -56,7 +56,7 @@ model Audio {
   originalName String
   mimeType     String
   size         Int
-  filePath     String
+  filePath     String   
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
