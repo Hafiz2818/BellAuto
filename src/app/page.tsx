@@ -239,84 +239,144 @@ function ThemeSelector() {
   )
 }
 
-// ==================== GUEST PAGE ====================
-function GuestPage({ 
-  onAdminLogin, 
-  onPetugasLogin, 
+// ==================== GUEST PAGE (FIXED + TYPE-SAFE) ====================
+
+interface GuestPageProps {
+  onAdminLogin: () => void;
+  onPetugasLogin: () => void;
+  onRegister: () => void;
+  schools: PublicSchool[];
+  isAuthenticated?: boolean;
+  onGoToDashboard?: () => void;
+}
+
+export function GuestPage({
+  onAdminLogin,
+  onPetugasLogin,
   onRegister,
   schools,
-  isAuthenticated,
-  onGoToDashboard
-}: { 
-  onAdminLogin: () => void
-  onPetugasLogin: () => void
-  onRegister: () => void
-  schools: PublicSchool[]
-  isAuthenticated?: boolean
-  onGoToDashboard?: () => void
-}) {
-  const { theme, isDark } = useContext(ThemeContext)
-  const currentTheme = themeColors[theme]
+  isAuthenticated = false,
+  onGoToDashboard,
+}: GuestPageProps) {
+  const { theme, isDark } = useContext(ThemeContext);
+  // ✅ Type assertion agar TypeScript tidak error saat akses themeColors
+  const currentTheme = themeColors[theme as keyof typeof themeColors];
+
+  // ✅ Helper untuk class names (menghindari template literal kompleks di JSX)
+  const getHeaderBg = () =>
+    isDark ? "border-white/10 bg-black/20" : "border-slate-200 bg-white/50";
+
+  const getTextPrimary = () => (isDark ? "text-white" : "text-slate-800");
+  const getTextSecondary = () => (isDark ? "text-white/60" : "text-slate-500");
+  const getTextMuted = () => (isDark ? "text-white/50" : "text-slate-400");
+
+  const getCardBg = () =>
+    isDark
+      ? "bg-white/10 backdrop-blur hover:bg-white/15"
+      : "bg-white shadow-lg shadow-slate-200/50 hover:shadow-xl";
+
+  const getButtonOutline = () =>
+    `bg-transparent ${
+      isDark
+        ? "border-white/30 text-white hover:bg-white/10 hover:text-white"
+        : "border-slate-300 text-slate-700 hover:bg-slate-100"
+    }`;
+
+  const getButtonPrimary = () =>
+    `bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg shadow-${currentTheme.primary}-500/25`;
 
   return (
-    <div className={`min-h-screen transition-colors duration-500 ${
-      isDark 
-        ? `bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900` 
-        : `bg-gradient-to-br from-slate-50 via-white to-slate-100`
-    } flex flex-col`}>
+    // ✅ FIX 1: overflow-x-hidden mencegah horizontal scroll di mobile
+    <div
+      className={`min-h-screen transition-colors duration-500 overflow-x-hidden bg-gradient-to-br ${
+        isDark
+          ? "from-slate-900 via-slate-800 to-slate-900"
+          : "from-slate-50 via-white to-slate-100"
+      } flex flex-col`}
+    >
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${currentTheme.gradient} animate-pulse`} />
-        <div className={`absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${currentTheme.gradient} animate-pulse`} style={{ animationDelay: "1s" }} />
+        <div
+          className={`absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${currentTheme.gradient} animate-pulse`}
+        />
+        <div
+          className={`absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${currentTheme.gradient} animate-pulse`}
+          style={{ animationDelay: "1s" }}
+        />
       </div>
 
       {/* Header */}
-      <header className={`relative z-10 border-b backdrop-blur-xl ${isDark ? "border-white/10 bg-black/20" : "border-slate-200 bg-white/50"}`}>
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 bg-gradient-to-br ${currentTheme.gradient} rounded-xl shadow-lg shadow-${currentTheme.primary}-500/20`}>
-              <Bell className="w-6 h-6 text-white" />
+      {/* ✅ FIX 2: py-3 mobile, flex-wrap, gap-2 */}
+      <header
+        className={`relative z-20 border-b backdrop-blur-xl ${getHeaderBg()}`}
+      >
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          {/* Logo + Title */}
+          {/* ✅ FIX 3: min-w-0 + truncate agar judul tidak overflow */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div
+              className={`p-2.5 bg-gradient-to-br ${currentTheme.gradient} rounded-xl shadow-lg shadow-${currentTheme.primary}-500/20 flex-shrink-0`}
+            >
+              <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Bel Sekolah Otomatis</h1>
-              <p className={`text-xs ${isDark ? "text-white/60" : "text-slate-500"}`}>Sistem Bel Digital Modern</p>
+            <div className="min-w-0">
+              <h1
+                className={`text-base sm:text-lg font-bold truncate ${getTextPrimary()}`}
+              >
+                Bel Sekolah Otomatis
+              </h1>
+              <p
+                className={`text-xs ${getTextSecondary()} hidden xs:block`}
+              >
+                Sistem Bel Digital Modern
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          {/* Actions */}
+          {/* ✅ FIX 4: flex-wrap + gap konsisten */}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <ThemeSelector />
             {!isAuthenticated ? (
               <>
-                <Button 
-                  variant="outline" 
-                  className={`bg-transparent ${isDark ? "border-white/30 text-white hover:bg-white/10 hover:text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"} hidden sm:flex`}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${getButtonOutline()} hidden sm:flex`}
                   onClick={onPetugasLogin}
                 >
-                  <Key className="w-4 h-4 mr-2" />
-                  Petugas
+                  <Key className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Petugas</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className={`bg-transparent ${isDark ? "border-white/30 text-white hover:bg-white/10 hover:text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"} hidden sm:flex`}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${getButtonOutline()} hidden sm:flex`}
                   onClick={onRegister}
                 >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Daftar
+                  <UserPlus className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Daftar</span>
                 </Button>
-                <Button 
-                  className={`bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg shadow-${currentTheme.primary}-500/25`}
+                {/* ✅ FIX 5: Tombol utama mobile-first dengan label pendek */}
+                <Button
+                  size="sm"
+                  className={getButtonPrimary()}
                   onClick={onAdminLogin}
                 >
-                  <Lock className="w-4 h-4 mr-2" />
-                  Admin
+                  <Lock className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Admin</span>
+                  <span className="sm:hidden">Login</span>
                 </Button>
               </>
             ) : (
-              <Button 
-                className={`bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg shadow-${currentTheme.primary}-500/25`}
+              <Button
+                size="sm"
+                className={getButtonPrimary()}
                 onClick={onGoToDashboard}
               >
-                <Home className="w-4 h-4 mr-2" />
-                Dashboard
+                <Home className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Dashboard</span>
+                <span className="sm:hidden">Home</span>
               </Button>
             )}
           </div>
@@ -324,50 +384,71 @@ function GuestPage({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 relative z-10">
+      {/* ✅ FIX 6: pb-24 memberi ruang untuk mobile action buttons */}
+      <main className="flex-1 relative z-10 pb-24">
         {/* Hero Section */}
-        <section className="py-12 md:py-20">
+        {/* ✅ FIX 7: Padding responsif */}
+        <section className="py-8 sm:py-12 md:py-20">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 ${
-                isDark ? "bg-white/10 text-white/80" : "bg-slate-100 text-slate-600"
-              }`}>
-                <Sparkles className={`w-4 h-4 text-${currentTheme.primary}-500`} />
-                <span className="text-sm font-medium">Platform Bel Sekolah Terbaik</span>
+              <div
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4 sm:mb-6 ${
+                  isDark ? "bg-white/10 text-white/80" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                <Sparkles
+                  className={`w-4 h-4 text-${currentTheme.primary}-500`}
+                />
+                <span className="text-sm font-medium">
+                  Platform Bel Sekolah Terbaik
+                </span>
               </div>
-              
-              <h1 className={`text-4xl md:text-6xl font-bold mb-6 ${isDark ? "text-white" : "text-slate-800"}`}>
-                Sistem <span className={`bg-gradient-to-r ${currentTheme.gradient} bg-clip-text text-transparent`}>Bel Sekolah</span> Otomatis
+
+              <h1
+                className={`text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 ${getTextPrimary()}`}
+              >
+                Sistem{" "}
+                <span
+                  className={`bg-gradient-to-r ${currentTheme.gradient} bg-clip-text text-transparent`}
+                >
+                  Bel Sekolah
+                </span>{" "}
+                Otomatis
               </h1>
-              
-              <p className={`text-lg md:text-xl mb-8 max-w-2xl mx-auto ${isDark ? "text-white/70" : "text-slate-600"}`}>
-                Kelola jadwal bel sekolah dengan mudah dan efisien. Sistem otomatis yang memutar audio bel sesuai jadwal yang telah ditentukan.
+
+              <p
+                className={`text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-2xl mx-auto px-2 ${getTextSecondary()}`}
+              >
+                Kelola jadwal bel sekolah dengan mudah dan efisien. Sistem
+                otomatis yang memutar audio bel sesuai jadwal yang telah
+                ditentukan.
               </p>
-              
-              <div className="flex flex-wrap justify-center gap-4">
+
+              {/* ✅ FIX 8: Button group mobile-friendly */}
+              <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4 px-4">
                 {!isAuthenticated ? (
                   <>
-                    <Button 
-                      size="lg" 
-                      className={`bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg shadow-${currentTheme.primary}-500/25`}
+                    <Button
+                      size="lg"
+                      className={`${getButtonPrimary()} w-full sm:w-auto`}
                       onClick={onRegister}
                     >
                       <UserPlus className="w-5 h-5 mr-2" />
                       Daftar Sekarang
                     </Button>
-                    <Button 
-                      size="lg" 
+                    <Button
+                      size="lg"
                       variant="outline"
-                      className={`bg-transparent ${isDark ? "border-white/30 text-white hover:bg-white/10 hover:text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+                      className={`${getButtonOutline()} w-full sm:w-auto`}
                       onClick={onAdminLogin}
                     >
                       Sudah Punya Akun? Masuk
                     </Button>
                   </>
                 ) : (
-                  <Button 
-                    size="lg" 
-                    className={`bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg shadow-${currentTheme.primary}-500/25`}
+                  <Button
+                    size="lg"
+                    className={`${getButtonPrimary()} w-full sm:w-auto`}
                     onClick={onGoToDashboard}
                   >
                     <Home className="w-5 h-5 mr-2" />
@@ -380,12 +461,16 @@ function GuestPage({
         </section>
 
         {/* Clock Section */}
-        <section className="py-8">
+        <section className="py-4 sm:py-8">
           <div className="container mx-auto px-4">
-            <Card className={`max-w-2xl mx-auto border-0 shadow-2xl ${
-              isDark ? "bg-white/10 backdrop-blur-xl" : "bg-white shadow-slate-200/50"
-            }`}>
-              <CardContent className="py-10">
+            <Card
+              className={`max-w-2xl mx-auto border-0 shadow-2xl ${
+                isDark
+                  ? "bg-white/10 backdrop-blur-xl"
+                  : "bg-white shadow-slate-200/50"
+              }`}
+            >
+              <CardContent className="py-8 sm:py-10">
                 <RealTimeClock large themeGradient={currentTheme.gradient} />
               </CardContent>
             </Card>
@@ -393,28 +478,49 @@ function GuestPage({
         </section>
 
         {/* Features */}
-        <section className="py-12">
+        <section className="py-8 sm:py-12">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
               {[
-                { icon: Bell, title: "Bel Otomatis", desc: "Sistem bel otomatis berdasarkan jadwal yang ditentukan", color: themeColors.emerald.gradient },
-                { icon: Calendar, title: "Jadwal Fleksibel", desc: "Atur jadwal bel per hari dan waktu sesuai kebutuhan", color: themeColors.blue.gradient },
-                { icon: Music, title: "Audio Kustom", desc: "Upload dan gunakan audio bel sesuai keinginan", color: themeColors.violet.gradient }
+                {
+                  icon: Bell,
+                  title: "Bel Otomatis",
+                  desc: "Sistem bel otomatis berdasarkan jadwal yang ditentukan",
+                  color: themeColors.emerald.gradient,
+                },
+                {
+                  icon: Calendar,
+                  title: "Jadwal Fleksibel",
+                  desc: "Atur jadwal bel per hari dan waktu sesuai kebutuhan",
+                  color: themeColors.blue.gradient,
+                },
+                {
+                  icon: Music,
+                  title: "Audio Kustom",
+                  desc: "Upload dan gunakan audio bel sesuai keinginan",
+                  color: themeColors.violet.gradient,
+                },
               ].map((feature, i) => (
-                <Card 
+                <Card
                   key={i}
-                  className={`border-0 transition-all duration-300 hover:scale-105 ${
-                    isDark 
-                      ? "bg-white/10 backdrop-blur hover:bg-white/15" 
-                      : "bg-white shadow-lg shadow-slate-200/50 hover:shadow-xl"
-                  }`}
+                  className={`border-0 transition-all duration-300 hover:scale-105 ${getCardBg()}`}
                 >
-                  <CardContent className="pt-6 text-center">
-                    <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
-                      <feature.icon className="w-8 h-8 text-white" />
+                  <CardContent className="pt-6 text-center px-4 sm:px-6">
+                    <div
+                      className={`w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}
+                    >
+                      <feature.icon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>{feature.title}</h3>
-                    <p className={`text-sm mt-2 ${isDark ? "text-white/60" : "text-slate-500"}`}>{feature.desc}</p>
+                    <h3
+                      className={`text-base sm:text-lg font-semibold ${getTextPrimary()}`}
+                    >
+                      {feature.title}
+                    </h3>
+                    <p
+                      className={`text-sm mt-2 px-2 ${getTextSecondary()}`}
+                    >
+                      {feature.desc}
+                    </p>
                   </CardContent>
                 </Card>
               ))}
@@ -423,26 +529,36 @@ function GuestPage({
         </section>
 
         {/* Registered Schools */}
-        <section className="py-12">
+        <section className="py-8 sm:py-12">
           <div className="container mx-auto px-4">
             <div className="max-w-5xl mx-auto">
-              <div className="text-center mb-8">
-                <h2 className={`text-2xl md:text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-slate-800"}`}>
+              <div className="text-center mb-6 sm:mb-8 px-4">
+                <h2
+                  className={`text-xl sm:text-2xl md:text-3xl font-bold mb-2 ${getTextPrimary()}`}
+                >
                   Sekolah Terdaftar
                 </h2>
-                <p className={`${isDark ? "text-white/60" : "text-slate-500"}`}>
+                <p className={getTextSecondary()}>
                   Daftar sekolah yang sudah menggunakan sistem bel otomatis
                 </p>
               </div>
 
               {schools.length === 0 ? (
-                <Card className={`border-0 ${isDark ? "bg-white/10 backdrop-blur" : "bg-white shadow-lg"}`}>
+                <Card
+                  className={`border-0 mx-4 sm:mx-0 ${getCardBg()}`}
+                >
                   <CardContent className="py-12 text-center">
-                    <Building2 className={`w-16 h-16 mx-auto mb-4 ${isDark ? "text-white/30" : "text-slate-300"}`} />
-                    <p className={isDark ? "text-white/60" : "text-slate-500"}>Belum ada sekolah terdaftar</p>
+                    <Building2
+                      className={`w-16 h-16 mx-auto mb-4 ${
+                        isDark ? "text-white/30" : "text-slate-300"
+                      }`}
+                    />
+                    <p className={getTextSecondary()}>
+                      Belum ada sekolah terdaftar
+                    </p>
                     {!isAuthenticated && (
-                      <Button 
-                        className={`mt-4 bg-gradient-to-r ${currentTheme.gradient} text-white`}
+                      <Button
+                        className={`mt-4 ${getButtonPrimary()}`}
                         onClick={onRegister}
                       >
                         Jadilah yang pertama mendaftar
@@ -451,42 +567,56 @@ function GuestPage({
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {schools.map((school, i) => (
-                    <Card 
+                // ✅ FIX 9: Grid responsif + px untuk mobile
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-2 sm:px-0">
+                  {schools.map((school) => (
+                    <Card
                       key={school.id}
-                      className={`border-0 transition-all duration-300 hover:scale-[1.02] ${
-                        isDark 
-                          ? "bg-white/10 backdrop-blur hover:bg-white/15" 
-                          : "bg-white shadow-lg shadow-slate-200/50 hover:shadow-xl"
-                      }`}
+                      className={`border-0 transition-all duration-300 hover:scale-[1.02] ${getCardBg()}`}
                     >
-                      <CardContent className="p-5">
-                        <div className="flex items-start gap-4">
-                          <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            school.logoUrl 
-                              ? "bg-slate-100" 
-                              : `bg-gradient-to-br ${currentTheme.gradient}`
-                          }`}>
+                      <CardContent className="p-4 sm:p-5">
+                        <div className="flex items-start gap-3 sm:gap-4">
+                          {/* ✅ FIX 10: Logo responsive */}
+                          <div
+                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                              school.logoUrl
+                                ? "bg-slate-100"
+                                : `bg-gradient-to-br ${currentTheme.gradient}`
+                            }`}
+                          >
                             {school.logoUrl ? (
-                              <img src={school.logoUrl} alt={school.schoolName} className="w-12 h-12 object-contain rounded-lg" />
+                              <img
+                                src={school.logoUrl}
+                                alt={school.schoolName}
+                                className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
+                                loading="lazy"
+                              />
                             ) : (
-                              <School className="w-7 h-7 text-white" />
+                              <School className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                             )}
                           </div>
+                          {/* ✅ FIX 11: min-w-0 agar truncate berfungsi */}
                           <div className="flex-1 min-w-0">
-                            <h3 className={`font-semibold truncate ${isDark ? "text-white" : "text-slate-800"}`}>
+                            <h3
+                              className={`font-semibold truncate ${getTextPrimary()}`}
+                            >
                               {school.schoolName}
                             </h3>
                             {school.description && (
-                              <p className={`text-sm mt-1 line-clamp-2 ${isDark ? "text-white/60" : "text-slate-500"}`}>
+                              <p
+                                className={`text-sm mt-1 line-clamp-2 ${getTextSecondary()}`}
+                              >
                                 {school.description}
                               </p>
                             )}
                             {school.address && (
-                              <div className={`flex items-center gap-1 mt-2 text-xs ${isDark ? "text-white/50" : "text-slate-400"}`}>
-                                <MapPin className="w-3 h-3" />
-                                <span className="truncate">{school.address}</span>
+                              <div
+                                className={`flex items-center gap-1 mt-2 text-xs ${getTextMuted()}`}
+                              >
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">
+                                  {school.address}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -502,48 +632,58 @@ function GuestPage({
       </main>
 
       {/* Footer */}
-      <footer className={`relative z-10 border-t py-6 ${
-        isDark ? "border-white/10 bg-black/20" : "border-slate-200 bg-white/50"
-      }`}>
+      {/* ✅ FIX 12: mb-16 mobile agar tidak tertutup floating buttons */}
+      <footer
+        className={`relative z-10 border-t py-6 mb-16 sm:mb-0 ${getHeaderBg()}`}
+      >
         <div className="container mx-auto px-4 text-center">
-          <p className={`text-sm ${isDark ? "text-white/60" : "text-slate-500"}`}>
-            © 2024 Sistem Bel Sekolah Otomatis | Kelola bel sekolah dengan mudah
+          <p className={`text-sm ${getTextSecondary()}`}>
+            © 2024 Sistem Bel Sekolah Otomatis | Kelola bel sekolah dengan
+            mudah
           </p>
         </div>
       </footer>
 
       {/* Mobile Action Buttons */}
+      {/* ✅ FIX 13: z-50 + aria-label untuk aksesibilitas */}
       <div className="fixed bottom-4 right-4 flex flex-col gap-2 sm:hidden z-50">
         {!isAuthenticated ? (
           <>
-            <Button 
+            <Button
               size="icon"
-              className={`rounded-full bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg`}
+              className={`rounded-full ${getButtonPrimary()}`}
               onClick={onRegister}
+              aria-label="Daftar"
             >
               <UserPlus className="w-5 h-5" />
             </Button>
-            <Button 
+            <Button
               size="icon"
               variant="outline"
-              className={`rounded-full bg-transparent ${isDark ? "border-white/30 text-white hover:bg-white/10" : "border-slate-300 bg-white text-slate-700"}`}
+              className={`rounded-full bg-transparent ${
+                isDark
+                  ? "border-white/30 text-white hover:bg-white/10"
+                  : "border-slate-300 bg-white text-slate-700"
+              } shadow-lg`}
               onClick={onPetugasLogin}
+              aria-label="Login Petugas"
             >
               <Key className="w-5 h-5" />
             </Button>
           </>
         ) : (
-          <Button 
+          <Button
             size="icon"
-            className={`rounded-full bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg`}
+            className={`rounded-full ${getButtonPrimary()}`}
             onClick={onGoToDashboard}
+            aria-label="Buka Dashboard"
           >
             <Home className="w-5 h-5" />
           </Button>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ==================== LOGIN FORM ====================
